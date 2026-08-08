@@ -1,0 +1,109 @@
+# =============================================================================
+# Phase 0 -- Reproduce the SR4IR baseline (EDSR-baseline SR + DeepLabV3-MobileNetV3)
+# Segmentation, PASCAL VOC2012, scale x8.
+#
+# This is SR4IR's own options/seg/024_SR4IR_edsr_x8.yml, UNMODIFIED except:
+#   * `task: seg` is set explicitly (so the config can live outside options/seg/).
+#   * `name` matches the checkpoints/ folder for this project.
+# Target (SR4IR paper, Table 1, EDSR-baseline, x8, seg): mIoU 55.0 / LPIPS 0.380 / PSNR 23.91
+# =============================================================================
+name: phase0_edsr_baseline_seg_x8
+task: seg
+model_type: sr4ir_seg
+num_threads: 16
+print_freq: 45  # unit: iter
+manual_seed: 200
+scale: 8
+deterministic: true
+
+# data and augmentation
+data:
+  name: voc
+  path: datasets/VOC
+  base_size: 520
+  crop_size: 480
+
+# network specs
+network_sr:
+  name: edsr
+  n_blocks: 16
+  n_feats: 64
+network_seg:
+  name: deeplabv3_mobilenet_v3_large
+  weights_backbone: MobileNet_V3_Large_Weights.IMAGENET1K_V1
+  num_classes: 21
+  aux_loss: true
+
+# path for pretrained model
+# NOTE: download edsr_baseline_x8.pt from SR4IR's pretrained-models Google Drive
+#       (see assets/docs/Training.md) into experiments/pretrained_models/ first.
+path:
+  network_sr: experiments/pretrained_models/edsr_baseline_x8.pt
+  network_seg: ~
+
+# training config
+train:
+  batch_size: 16  # 1 GPU (48GB assumed); lower this if you OOM
+  epoch: 100
+  save_freq: 50  # unit: epoch
+  eval_freq: 5
+  warmup_epoch: 10
+
+  optim_sr:
+    type: AdamW
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.999]
+  optim_seg:
+    type: SGD
+    lr: !!float 2e-2
+    momentum: 0.9
+    weight_decay: !!float 1e-6
+
+  scheduler_sr:
+    type: CosineAnnealingRestartLR
+    periods: [10, 90]
+    restart_weights: [1, 1]
+    eta_min: !!float 1e-6
+  scheduler_seg:
+    type: CosineAnnealingRestartLR
+    periods: [10, 90]
+    restart_weights: [1, 1]
+    eta_min: !!float 1e-4
+
+  # phase 1 losses (SR update)
+  pixel_opt:
+    type: L1Loss
+    loss_weight: !!float 1.0
+    reduction: mean
+  tdp_opt:
+    type: FeatureLoss
+    loss_weight: !!float 1.0
+    criterion: l1
+    layer_weights:
+      C5: 1.0
+
+  # phase 2 losses (task update; CQMix = auxce_cqmix)
+  auxce_sr_opt:
+    type: AUXCELoss
+    loss_weight: !!float 0.34
+    aux_loss_weight: !!float 0.5
+    ignore_index: 255
+  auxce_hr_opt:
+    type: AUXCELoss
+    loss_weight: !!float 0.34
+    aux_loss_weight: !!float 0.5
+    ignore_index: 255
+  auxce_cqmix_opt:
+    type: AUXCELoss
+    loss_weight: !!float 0.34
+    aux_loss_weight: !!float 0.5
+    ignore_index: 255
+
+# testing config
+test:
+  batch_size: 1
+  calculate_lpips: false
+
+# DDP setting
+dist_url: env:://

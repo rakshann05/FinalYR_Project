@@ -1,0 +1,119 @@
+# =============================================================================
+# Phase 1 -- EFDN backbone swapped in for EDSR-baseline.
+# Everything else identical to Phase 0 (same task network, dataset, scale x8,
+# same TDP loss, same phase-2 task losses incl. CQMix) so the comparison is fair.
+#
+# Differences vs Phase 0:
+#   * network_sr.name: edsr -> efdn  (n_feats 64 -> 48, EFDN paper width)
+#   * added eg_opt: EFDN's edge-enhanced gradient-variance loss, kept ON TOP of
+#     pixel + TDP (combined SR loss = L_pixel + L_EG + L_TDP), per the brief.
+#   * network_sr pretrained path: ~ (scratch). EFDN releases only x2/x4 *folded*
+#     weights (model_zoo/EFDN_gv.pth), which are incompatible with the x8
+#     multi-branch training model, so there is no drop-in x8 init. See
+#     configs/phase1_efdn_pretrain_div2k_x8.yaml for an OPTIONAL DIV2K x8
+#     pre-training step you can run first and point `path.network_sr` at.
+# =============================================================================
+name: phase1_efdn_seg_x8
+task: seg
+model_type: sr4ir_seg
+num_threads: 16
+print_freq: 45  # unit: iter
+manual_seed: 200
+scale: 8
+deterministic: true
+
+# data and augmentation
+data:
+  name: voc
+  path: datasets/VOC
+  base_size: 520
+  crop_size: 480
+
+# network specs
+network_sr:
+  name: efdn
+  n_feats: 48
+  # deploy: false   # (default) train in multi-branch mode; reparameterize before benchmarking
+network_seg:
+  name: deeplabv3_mobilenet_v3_large
+  weights_backbone: MobileNet_V3_Large_Weights.IMAGENET1K_V1
+  num_classes: 21
+  aux_loss: true
+
+# path for pretrained model
+path:
+  network_sr: ~   # train EFDN from scratch (no released x8 EFDN weights); see note above
+  network_seg: ~
+
+# training config
+train:
+  batch_size: 16  # 1 GPU (48GB assumed); lower this if you OOM
+  epoch: 100
+  save_freq: 50  # unit: epoch
+  eval_freq: 5
+  warmup_epoch: 10
+
+  optim_sr:
+    type: AdamW
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.999]
+  optim_seg:
+    type: SGD
+    lr: !!float 2e-2
+    momentum: 0.9
+    weight_decay: !!float 1e-6
+
+  scheduler_sr:
+    type: CosineAnnealingRestartLR
+    periods: [10, 90]
+    restart_weights: [1, 1]
+    eta_min: !!float 1e-6
+  scheduler_seg:
+    type: CosineAnnealingRestartLR
+    periods: [10, 90]
+    restart_weights: [1, 1]
+    eta_min: !!float 1e-4
+
+  # phase 1 losses (SR update): L_pixel + L_EG + L_TDP
+  pixel_opt:
+    type: L1Loss
+    loss_weight: !!float 1.0
+    reduction: mean
+  eg_opt:
+    type: EGLoss
+    loss_weight: !!float 0.1   # start small; sweep later. EG term is a re-implementation (see losses/eg.py)
+    edge_weight: !!float 1.0
+    gv_weight: !!float 1.0
+    patch_size: 8
+  tdp_opt:
+    type: FeatureLoss
+    loss_weight: !!float 1.0
+    criterion: l1
+    layer_weights:
+      C5: 1.0
+
+  # phase 2 losses (task update; CQMix = auxce_cqmix)
+  auxce_sr_opt:
+    type: AUXCELoss
+    loss_weight: !!float 0.34
+    aux_loss_weight: !!float 0.5
+    ignore_index: 255
+  auxce_hr_opt:
+    type: AUXCELoss
+    loss_weight: !!float 0.34
+    aux_loss_weight: !!float 0.5
+    ignore_index: 255
+  auxce_cqmix_opt:
+    type: AUXCELoss
+    loss_weight: !!float 0.34
+    aux_loss_weight: !!float 0.5
+    ignore_index: 255
+
+# testing config
+test:
+  batch_size: 1
+  calculate_lpips: false
+
+# DDP setting
+dist_url: env:://

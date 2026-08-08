@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# SR4IR runtime outputs (regenerated per run)
+models/sr4ir_original/experiments/
+models/sr4ir_original/tb_loggers/
+models/sr4ir_original/datasets/
+models/sr4ir_original/options/_generated/
+tb_loggers/
+
+# Training/eval artifacts
+logs/*.log
+*.tar
+datasets/
+
+# Trained checkpoints (large; keep the folders + READMEs, not the weights)
+checkpoints/**/*.pth
+checkpoints/**/*.pt
+
+# Local editor/agent config
+.claude/
