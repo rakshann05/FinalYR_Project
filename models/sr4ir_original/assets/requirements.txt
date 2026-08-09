@@ -8,3 +8,4 @@ pyyaml
 ptflops
 gpustat
 pycocotools
+pytorch_msssim

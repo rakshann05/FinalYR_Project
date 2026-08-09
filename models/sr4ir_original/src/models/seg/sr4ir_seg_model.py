@@ -59,7 +59,11 @@ class SR4IRSegmentationModel(BaseModel):
         # phase 1
         if train_opt.get('pixel_opt'):
             self.cri_pix = build_loss(train_opt['pixel_opt'], self.text_logger).to(self.device)
-        
+
+        if train_opt.get('ssim_opt'):
+            # SSIM loss; paired with pixel loss as PSFL (pixel + SSIM)
+            self.cri_ssim = build_loss(train_opt['ssim_opt'], self.text_logger).to(self.device)
+
         if train_opt.get('tdp_opt'):
             # task driven perceptual loss
             self.cri_tdp = build_loss(train_opt['tdp_opt'], self.text_logger).to(self.device)
@@ -146,6 +150,12 @@ class SR4IRSegmentationModel(BaseModel):
                 metric_logger.meters["l_pix"].update(l_pix.item())
                 self.tb_logger.add_scalar('losses/l_pix', l_pix.item(), current_iter)
                 l_total_sr += l_pix
+            if hasattr(self, 'cri_ssim'):
+                # SSIM loss (PSFL = pixel + SSIM) -> always on
+                l_ssim = self.cri_ssim(img_sr, img_hr)
+                metric_logger.meters["l_ssim"].update(l_ssim.item())
+                self.tb_logger.add_scalar('losses/l_ssim', l_ssim.item(), current_iter)
+                l_total_sr += l_ssim
             if hasattr(self, 'cri_eg'):
                 # EFDN EG loss operates in the pixel/gradient domain -> always on
                 l_eg = self.cri_eg(img_sr, img_hr)

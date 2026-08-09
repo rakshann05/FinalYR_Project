@@ -4,6 +4,7 @@ from .det import DETLoss
 from .eg import EGLoss
 from .gan import GANLoss
 from .seg import AUXCELoss
+from .ssim import SSIMLoss
 
 def build_loss(opt_loss, logger):
     """Build loss from options.
