@@ -1,4 +1,12 @@
 '''
+!!! DISCONNECTED / UNUSED -- NOT part of training. !!!
+EFDN's edge-enhancement is ARCHITECTURAL: it lives in the EDBB diverse-branch
+block (Sobel-x/y + Laplacian branches in efdn_unitv2.py) that is folded by
+reparameterize()/switch_to_deploy(). It is NOT a training-loss term. This module
+is therefore no longer registered in losses/__init__.py, not referenced by any
+config, and not called from the training loop. It is kept only for reference /
+history and can be deleted without affecting anything. Do not re-wire it as a loss.
+
 EG loss = Edge loss + Gradient-Variance loss, for the EFDN backbone.
 
 IMPORTANT / PROVENANCE:

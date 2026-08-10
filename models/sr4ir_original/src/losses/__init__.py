@@ -1,7 +1,6 @@
 from .cls import CELoss
 from .common import L1Loss, MSELoss, FeatureLoss, PerceptualLoss
 from .det import DETLoss
-from .eg import EGLoss
 from .gan import GANLoss
 from .seg import AUXCELoss
 from .ssim import SSIMLoss

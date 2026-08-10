@@ -68,10 +68,9 @@ class SR4IRSegmentationModel(BaseModel):
             # task driven perceptual loss
             self.cri_tdp = build_loss(train_opt['tdp_opt'], self.text_logger).to(self.device)
 
-        if train_opt.get('eg_opt'):
-            # EFDN edge-enhanced gradient-variance loss (see losses/eg.py).
-            # Kept alongside pixel + TDP loss for the EFDN backbone.
-            self.cri_eg = build_loss(train_opt['eg_opt'], self.text_logger).to(self.device)
+        # NOTE: EFDN's "edge-enhancement" is architectural (the EDBB diverse-branch
+        # block that gets reparameterized), NOT a training loss. There is
+        # deliberately no EG *loss* term here.
 
         # phase 2
         if train_opt.get('auxce_sr_opt'):
@@ -156,12 +155,7 @@ class SR4IRSegmentationModel(BaseModel):
                 metric_logger.meters["l_ssim"].update(l_ssim.item())
                 self.tb_logger.add_scalar('losses/l_ssim', l_ssim.item(), current_iter)
                 l_total_sr += l_ssim
-            if hasattr(self, 'cri_eg'):
-                # EFDN EG loss operates in the pixel/gradient domain -> always on
-                l_eg = self.cri_eg(img_sr, img_hr)
-                metric_logger.meters["l_eg"].update(l_eg.item())
-                self.tb_logger.add_scalar('losses/l_eg', l_eg.item(), current_iter)
-                l_total_sr += l_eg
+            # (No EG loss term: EFDN's edge-enhancement is architectural, not a loss.)
             if epoch > self.warmup_epoch:
                 if hasattr(self, 'cri_tdp'):
                     self.net_seg.eval()

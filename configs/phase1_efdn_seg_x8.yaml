@@ -5,8 +5,9 @@
 #
 # Differences vs Phase 0:
 #   * network_sr.name: edsr -> efdn  (n_feats 64 -> 48, EFDN paper width)
-#   * added eg_opt: EFDN's edge-enhanced gradient-variance loss, kept ON TOP of
-#     pixel + TDP (combined SR loss = L_pixel + L_EG + L_TDP), per the brief.
+#   * added ssim_opt: PSFL = pixel + SSIM. Combined SR loss = PSFL + L_TDP.
+#     (EFDN's edge-enhancement is architectural via the EDBB block, NOT a loss
+#      term, so there is deliberately no EG loss here.)
 #   * network_sr pretrained path: ~ (scratch). EFDN releases only x2/x4 *folded*
 #     weights (model_zoo/EFDN_gv.pth), which are incompatible with the x8
 #     multi-branch training model, so there is no drop-in x8 init. See
@@ -75,7 +76,9 @@ train:
     restart_weights: [1, 1]
     eta_min: !!float 1e-4
 
-  # phase 1 losses (SR update): PSFL (L_pixel + L_SSIM) + L_EG + L_TDP
+  # phase 1 losses (SR update): PSFL (L_pixel + L_SSIM) + L_TDP
+  # NOTE: no EG loss. EFDN's edge-enhancement is architectural (the EDBB
+  # diverse-branch block that is reparameterized), not a training-loss term.
   pixel_opt:
     type: L1Loss
     loss_weight: !!float 1.0
@@ -85,12 +88,6 @@ train:
     loss_weight: !!float 0.1   # PSFL = w_pixel*L1 + w_ssim*(1-SSIM); requires pytorch_msssim
     data_range: !!float 1.0
     win_size: 11
-  eg_opt:
-    type: EGLoss
-    loss_weight: !!float 0.1   # start small; sweep later. EG term is a re-implementation (see losses/eg.py)
-    edge_weight: !!float 1.0
-    gv_weight: !!float 1.0
-    patch_size: 8
   tdp_opt:
     type: FeatureLoss
     loss_weight: !!float 1.0
